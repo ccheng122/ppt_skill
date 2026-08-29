@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+scripts/example_deck.pptx
+scripts/example_chart.png
