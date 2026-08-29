@@ -11,6 +11,7 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+from pptx.oxml.ns import qn
 
 # ---- neutrals and semantic colors (a generic, reusable base) ----
 INK      = RGBColor(0x15, 0x20, 0x2A)   # primary text
@@ -185,10 +186,112 @@ def pic(s, path, x, y, w):
     return s.shapes.add_picture(path, Inches(x), Inches(y), width=Inches(w))
 
 
-def eyebrow(s, text, kicker=None):
-    """Section label at the top of a slide, with an optional right-aligned kicker."""
-    rect(s, 0.55, 0.5, 0.34, 0.05, ACCENT, round_=False)
-    txt(s, 0.95, 0.4, 9.0, 0.35, [[R(text, 11.5, ACCENT, True, 1.4, True)]])
+def add_soft_shadow(shape, blur_pt=9, dist_pt=1.5, alpha_pct=20, dir_deg=90):
+    """Attach a soft outer drop shadow to any autoshape (spec pulled from a
+    real reference deck's chart-card treatment: 9pt blur, 1.5pt straight-down
+    offset, black at 20% alpha). python-pptx has no high-level shadow API for
+    a custom effect, so this writes the a:effectLst/a:outerShdw XML directly;
+    call it right after creating the shape, before adding anything on top."""
+    spPr = shape._element.spPr
+    effectLst = spPr.makeelement(qn('a:effectLst'), {})
+    outerShdw = effectLst.makeelement(qn('a:outerShdw'), {
+        'blurRad': str(int(blur_pt * 12700)),
+        'dist': str(int(dist_pt * 12700)),
+        'dir': str(int(dir_deg * 60000)),
+        'rotWithShape': '0',
+        'algn': 'bl',
+    })
+    srgbClr = outerShdw.makeelement(qn('a:srgbClr'), {'val': '000000'})
+    alpha = srgbClr.makeelement(qn('a:alpha'), {'val': str(alpha_pct * 1000)})
+    srgbClr.append(alpha)
+    outerShdw.append(srgbClr)
+    effectLst.append(outerShdw)
+    spPr.append(effectLst)
+
+
+def chart_card(s, x, y, w, h, pad=0.15, corner=0.06):
+    """White rounded-rect frame + soft drop shadow behind a chart image, so
+    the chart reads as a card rather than floating loose on the slide (a
+    pattern pulled from a real reference deck, not invented). Call this
+    BEFORE placing the picture with pic(x, y, w) at the same x/y/w/h, so the
+    picture renders on top of the card. h should be the chart's own display
+    height (w / the source image's aspect ratio), not counting pad.
+
+    A callout/band placed directly under one or more chart cards should span
+    the cards' combined outer footprint (x - pad to the last card's x + w +
+    pad), not the slide's full content width, or the edges visibly mismatch.
+    """
+    shp = rect(s, x - pad, y - pad, w + 2 * pad, h + 2 * pad, WHITE, round_=True)
+    try:
+        shp.adjustments[0] = corner
+    except Exception:
+        pass
+    shp.line.fill.background()
+    add_soft_shadow(shp)
+    return shp
+
+
+def eyebrow(s, text, kicker=None, x0=0.55):
+    """Section label at the top of a slide, with an optional right-aligned kicker.
+
+    x0 is the content left margin; pass it through when a left section_bar()
+    (or anything else) has shifted content off the default 0.55 margin.
+    """
+    rect(s, x0, 0.5, 0.34, 0.05, ACCENT, round_=False)
+    txt(s, x0 + 0.4, 0.4, 8.55 - (x0 - 0.55), 0.35, [[R(text, 11.5, ACCENT, True, 1.4, True)]])
+
+
+def section_bar(s, label, bar_w=0.42, slide_w=13.333, slide_h=7.5, font_size=14):
+    """Full-height color rail on the left edge, rotated text labeling which
+    part of the story this slide is (a real pattern from a reference deck's
+    per-section spine: a rotated rectangle, one color per section, walking
+    the deck as you go). Optional, not a default: offer it the way
+    divider()/agenda() are offered, don't add it unprompted.
+
+    A single narrative deck (most decks here) has no real sections to color
+    differently, so default to ONE accent color throughout with the label
+    text changing per slide (e.g. eyebrow's own text) rather than inventing
+    arbitrary per-slide colors that carry no real meaning. Reserve distinct
+    colors per call for a deck that actually has distinct named sections.
+
+    Content on the slide (eyebrow, footer, headline, everything) needs its
+    left margin shifted right to clear the bar; a margin of bar_w + ~0.55in
+    from the slide edge reads clean. Pass x0=<that margin> to eyebrow() and
+    footer(), and use the same left x for every other element on the slide.
+
+    Mechanics: this is a plain rectangle rotated -90 degrees about its own
+    center (rot="-5400000" in the underlying XML), which is how a reference
+    deck built the same effect. That rotation maps the unrotated box's LEFT
+    edge to the bar's BOTTOM and its RIGHT edge to the bar's TOP (confirmed
+    against that reference deck, which right-aligns its own rail text the
+    same way). So right-aligning the paragraph here, plus a right-side inset,
+    is what actually reads as "top-aligned" once the whole shape rotates;
+    center alignment puts the label at the vertical middle of the slide,
+    which reads as floating rather than a section tag.
+    """
+    cx, cy = bar_w / 2, slide_h / 2
+    left, top = cx - slide_h / 2, cy - bar_w / 2
+    shp = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(left), Inches(top),
+                              Inches(slide_h), Inches(bar_w))
+    shp.rotation = -90
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = ACCENT
+    shp.line.fill.background()
+    shp.shadow.inherit = False
+    tf = shp.text_frame
+    tf.word_wrap = False
+    tf.margin_left = 0
+    tf.margin_right = Inches(0.4)  # inset from the box's right edge = gap from the bar's visual top
+    tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.RIGHT
+    r = p.add_run()
+    r.text = label
+    r.font.size = Pt(font_size)
+    r.font.bold = True
+    r.font.color.rgb = WHITE
+    r.font.name = FONT
+    return shp
     if kicker:
         txt(s, 9.0, 0.38, 3.8, 0.35, [[R(kicker, 11, FAINT, False, 0.3)]], align=PP_ALIGN.RIGHT)
 
@@ -244,6 +347,11 @@ def table(s, x, y, w, h, headers, rows, col_widths=None):
     is equal columns. Header row fills with the active ACCENT; body rows
     alternate white and CARD for scan-ability.
     """
+    # A thin grey outline behind the table: without it, white body rows have
+    # no edge and blend straight into the slide's white background (caught in
+    # real use: a lone table on an otherwise-white slide read as floating).
+    rect(s, x - 0.02, y - 0.02, w + 0.04, h + 0.04, WHITE, line=BORDER, round_=False)
+
     n_cols = len(headers)
     gshape = s.shapes.add_table(len(rows) + 1, n_cols, Inches(x), Inches(y), Inches(w), Inches(h))
     tbl = gshape.table
@@ -319,11 +427,13 @@ def two_up(s, x, y, w, h, items, gap=0.5, label_size=11):
         pic(s, img_path, cx, y + 0.4, col_w)
 
 
-def footer(s, text, page=None):
+def footer(s, text, page=None, x0=0.55):
     """Small bottom-of-slide caption: a source, date, or confidentiality
     line, with an optional page number right-aligned at the same baseline.
+
+    x0 is the content left margin; pass it through alongside eyebrow(x0=...).
     """
-    txt(s, 0.55, 7.05, 10.6, 0.3, [[R(text, 9, FAINT)]])
+    txt(s, x0, 7.05, 10.6 - (x0 - 0.55), 0.3, [[R(text, 9, FAINT)]])
     if page is not None:
         txt(s, 11.3, 7.05, 1.48, 0.3, [[R(str(page), 9, FAINT)]], align=PP_ALIGN.RIGHT)
 

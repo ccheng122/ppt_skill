@@ -17,6 +17,7 @@ a deliberately chosen accent palette).
 - `SKILL.md` the workflow and rules.
 - `scripts/deck_helpers.py` palette options plus thin `python-pptx` wrappers.
 - `scripts/chart_helpers.py` matplotlib defaults so charts match the deck.
+- `scripts/measure.py` real text-wrap measurement, so box heights come from the actual copy instead of a guess.
 - `scripts/example_build.py` a minimal end to end pattern.
 
 ## Requires
