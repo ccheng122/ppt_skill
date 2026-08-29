@@ -34,9 +34,14 @@ Do not treat a slide count as a target. The common failure is padding: many spar
 
 The arc is: lead with the answer, earn trust with the setup, let the data land.
 
+**Longer decks:** if the deck looks like it will run past ~8 slides or cover 3+ distinct sections, ask the user whether they want an `agenda()` slide up front and `divider()` slides between sections, don't add them unprompted. Skip asking entirely on a short, single-thread deck.
+
 ## Charts carry the story
 
 Build charts from the real data with `matplotlib`, save as transparent PNG, and embed them as pictures. A ramp line or a comparison bar communicates far more than a table of the same numbers, and it is the reason to make slides instead of pasting text. Style every chart the same way so the deck reads as one system; `scripts/chart_helpers.py` sets the palette and axes for you.
+
+- **Always label the y axis** with `ax.set_ylabel(...)` naming the actual metric and its unit ("Revenue ($)", "Signups", "Edit rate (%)"). An unlabeled axis reads as unfinished.
+- **Large counts get truncated, not spelled out.** For any axis or number in the thousands or millions, use `chart_helpers.compact_number()` (or `style(ax, compact=True)` to format the whole axis): `1,400` becomes `1.4K`, `2,300,000` becomes `2.3M`, one decimal, matching the deck's fixed-precision style. Pass `currency=True` to prefix with `$` for a monetary metric (`$1.4K`, `$2.3M`). Use `style(ax, pct=True)` instead for a percent axis, the two are mutually exclusive.
 
 ## Use the bundled helpers
 
@@ -52,7 +57,10 @@ Write a short build script that imports these, generates the chart PNGs, then la
 - **No em dashes, anywhere.** This is a standing preference. Use a period, comma, semicolon, colon, or parentheses instead; write numeric ranges as "X to Y". Before handing off, scan every text run for the em dash character and confirm there are zero. (Arrows and mid dots are fine; hyphens in compound words are fine.)
 - **Percentages as `X.X%` for stakeholder decks.** Format rates like `8.6%`, not `0.086`, with one decimal, unless the user says otherwise. Counts stay as counts.
 - **Font: Arial.** It is present in both PowerPoint and Google Slides, so it will not silently fall back the way a Google font would.
-- **Palette: choose one deliberately, do not default to any single look.** Pick an accent that fits the subject or matches what the deck mirrors (the Hex app, a brand, the source deliverable). `deck_helpers.py` ships a set of accent options in `PALETTES` (teal, indigo, plum, forest, rust, slate); call `use_palette("indigo")` in the build script to set one, or pass a custom `{accent, ink, soft}` dict. None of them is a house style, so choose per deck rather than reaching for the same one every time; the neutrals and the semantic good and warning colors are shared across all of them. To keep charts consistent, set the chart accent to the same palette's `hex` (`GROUP_COLORS["focus"] = PAL["hex"]`). Keep it restrained: one accent, considered neutrals, and semantic good and warning reserved for verdict callouts.
+- **Palette: choose one deliberately, do not default to any single look.**
+  - **Deck for a specific company or brand:** pull their real primary brand color (from what they've shared, their site, or their style guide, don't guess) and derive the deck's accent from it with `deck_helpers.palette_from_hex("#xxxxxx")`. This keeps the deck's own hue rather than pasting a raw, unadjusted brand hex on, and it only corrects a color that would read badly at deck scale (too light or too washed out for small text). Pass the result straight to `use_palette(...)`. If the brand has several colors, use their dominant one; the deck stays one accent, it does not try to reproduce a whole brand system. If you can't confirm the exact hex (no reliable source, or the brand's identity is genuinely multicolor/gradient rather than one solid color), say so plainly and either ask the user for the exact value or fall back to a shipped palette rather than presenting a guess as confirmed.
+  - **Generic or internal deck, nothing to match:** call `use_palette(...)` with one of the shipped `PALETTES` (teal, indigo, plum, forest, rust, slate) in `deck_helpers.py`, or a custom `{accent, ink, soft}` dict. Reach for a neutral-leaning one first (`NEUTRAL_PALETTES`: slate, teal, forest, indigo); reach for plum or rust only when the subject calls for more warmth. None of them is a house style, choose per deck rather than reaching for the same one every time.
+  - The neutrals and the semantic good and warning colors are shared across every palette, derived or shipped. To keep charts consistent, set the chart accent to the same palette's `hex` (`GROUP_COLORS["focus"] = PAL["hex"]`). Keep it restrained: one accent, considered neutrals, and semantic good and warning reserved for verdict callouts.
 
 ## Validate before you hand it off
 
