@@ -35,14 +35,46 @@ def setup():
     })
 
 
-def style(ax, pct=False):
-    """Drop top/right spines, add a light y grid. Set pct=True for a percent y axis."""
+def compact_number(v, currency=False):
+    """Format a large number as 1.4K / 2.3M, one decimal, matching the deck's
+    fixed-precision style (see SKILL.md's X.X% rule). Prefix with $ when
+    currency=True. Small values (under 1000) print plain, still one decimal
+    if not a whole number."""
+    sign = "-" if v < 0 else ""
+    v = abs(v)
+    if v >= 1_000_000:
+        scaled, suffix = v / 1_000_000, "M"
+    elif v >= 1_000:
+        scaled, suffix = v / 1_000, "K"
+    else:
+        scaled, suffix = None, None
+
+    if suffix:
+        scaled = round(scaled, 1)
+        if scaled >= 1000 and suffix == "K":  # e.g. 999,999 rounds to 1000.0K, bump to 1.0M
+            scaled, suffix = scaled / 1000, "M"
+        s = f"{scaled:.1f}{suffix}"
+    else:
+        s = f"{v:.0f}" if float(v).is_integer() else f"{v:.1f}"
+    return f"{sign}{'$' if currency else ''}{s}"
+
+
+def style(ax, pct=False, compact=False, currency=False):
+    """Drop top/right spines, add a light y grid, and format the y axis.
+
+    Set pct=True for a percent axis, or compact=True for large counts
+    (1.4K, 2.3M); add currency=True with compact for a $ prefix. Always pair
+    this with ax.set_ylabel(...) naming the actual metric and its unit, an
+    axis with no label is a common review catch.
+    """
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", color=GRID, linewidth=0.7, alpha=0.8)
     ax.set_axisbelow(True)
     if pct:
         ax.yaxis.set_major_formatter(lambda v, _: f"{v:.0f}%")
+    elif compact:
+        ax.yaxis.set_major_formatter(lambda v, _: compact_number(v, currency=currency))
 
 
 def save(fig, path):
