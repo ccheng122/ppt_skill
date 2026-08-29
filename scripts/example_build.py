@@ -8,6 +8,7 @@ import os
 from pptx.enum.text import PP_ALIGN
 import chart_helpers as C
 import deck_helpers as D
+import measure as M
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,9 +38,14 @@ D.eyebrow(s, "Example Readout", "2026")
 D.txt(s, 0.55, 1.0, 12.2, 0.7, [[D.R("The headline answer, stated first", 34, D.INK, True)]])
 D.txt(s, 0.55, 1.95, 12.3, 0.6,
       [[D.R("One or two sentences of context, in the source's own words.", 15, D.INK2)]], line_sp=1.2)
+
+# measure before you place it: this is the check to run right after every
+# text block, not just this one, see "Verify layout" in SKILL.md.
+key_point = "A verdict the reader should walk away with. Rates read as 22.2%, not 0.222."
+M.assert_fits("slide1 band", [[("Key point.  ", 15, True), (key_point, 15, False)]], 12.23 - 0.6, 1.1, line_sp=1.1)
 D.band(s, 3.0,
        [D.R("Key point.  ", 15, D.ACCENT_INK, True),
-        D.R("A verdict the reader should walk away with. Rates read as 22.2%, not 0.222.", 15, D.INK)],
+        D.R(key_point, 15, D.INK)],
        h=1.1)
 
 # Slide 2: deep dive with a chart
@@ -47,6 +53,7 @@ s = D.add_slide(prs)
 D.eyebrow(s, "Deep dive")
 D.txt(s, 0.55, 1.0, 12.2, 0.7, [[D.R("What the chart shows", 30, D.INK, True)]])
 D.txt(s, 0.55, 1.8, 6.0, 0.3, [[D.R("Edit rate by week", 11, D.FAINT, True, 0.6, True)]])
+D.chart_card(s, 0.55, 2.15, 6.4, 3.36)  # call before pic(), same x/y/w, so the picture sits on top
 D.pic(s, chart_path, 0.55, 2.15, 6.4)
 D.rect(s, 7.15, 2.15, 5.63, 3.4, D.WHITE, line=D.BORDER)
 D.txt(s, 7.4, 2.35, 5.15, 3.0,
